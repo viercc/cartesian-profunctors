@@ -21,7 +21,8 @@ library
     Data.Profunctor.Exhaust,
     Data.Profunctor.UniconEncoding,
     Data.Finitary.Enum,
-    Data.PTraversable
+    Data.PTraversable,
+    Data.Finitary.TreeRep
   other-modules:
     Data.PTraversable.Internal.Day,
     Data.Profunctor.Extra,
