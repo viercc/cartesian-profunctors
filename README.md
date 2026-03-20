@@ -1,14 +1,8 @@
-Ahhhhhhhhhhhhh, I found a library that implements what I tried to **really well**!
-
-[one-liner](http://hackage.haskell.org/package/one-liner-0.6/docs/Generics-OneLiner.html#g:6)
-
-but I leave this as is, since this file is somewhat another explanatory document to the idea this and that package commonly have.
-
------------------------------------------
-
 # cartesian-profunctors
 
 This package provides three major type classes. Two of them are defined in [Data.Profunctor.Cartesian](src/Data/Profunctor/Cartesian.hs), and the remaining one is defined in [Data.PTraversable](src/Data/PTraversable.hs).
+
+**IMPORTANT:** This library overlaps to these pre-existing libraries _a lot_. See Competing packages section.
 
 ## Data.Profunctor.Cartesian
 
@@ -198,6 +192,18 @@ instance PTraversable Two where
   * How `PTraversable` law should look like?
 * Documentation
 * Check performance: are `traverseDefault`, `eqDefault`, etc. slower than manually implemented one?
+
+## Competeing packages
+
+- [product-profunctors](https://hackage.haskell.org/package/product-profunctors)
+
+- [one-liner](http://hackage.haskell.org/package/one-liner)
+
+  - Focus is on "`PTraversable` = generic programming without type-level shenanigans" aspect
+
+- [distributors](https://hackage.haskell.org/package/distributors)
+
+  - Focus is on bidirectional programming
 
 --------
 
