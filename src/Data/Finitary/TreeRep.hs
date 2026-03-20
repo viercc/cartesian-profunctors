@@ -250,6 +250,16 @@ sndEval r1 r2 z = case r1 of
 data Encoder a b s t where
   Encoder :: SRep r -> (s -> Eval r a) -> (Eval r b -> t) -> Encoder a b s t
 
+idEncoding :: Encoder a b a b
+idEncoding = Encoder sIdRep idEnc idDec
+  where
+    sIdRep = SCase (SPar (SCase SUnit SEmpty)) SEmpty
+    idEnc :: c -> Eval '[ParRep '[UnitRep]] c
+    idEnc c = EHere (EPar c (EHere EUnit))
+    idDec :: Eval '[ParRep '[UnitRep]] c -> c
+    idDec (EHere (EPar c _)) = c
+    idDec (EThere rest) = absurdEval rest
+
 deriving instance Functor (Encoder a b s)
 
 instance Profunctor (Encoder a b) where
