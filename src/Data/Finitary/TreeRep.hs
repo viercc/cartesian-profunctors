@@ -6,6 +6,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE EmptyCase #-}
+
 module Data.Finitary.TreeRep where
 
 import Data.Kind (Type)
@@ -28,6 +29,44 @@ import Data.Profunctor.Cartesian
 -- represent sum type
 --
 -- > {t1} + {t2} + ...
+--
+-- ==== Theories
+--
+-- @Rep@ can be thought of as a datatype representing
+-- a thing called /skew semiring freely generated from one generator/.
+-- 
+-- Semiring is an abstract algebraic structure with addition and multiplication,
+-- but not necessarily have subtraction. Typical instance of semiring is
+-- @Integer@ or @Natural@.
+--
+-- Skew semiring is another abstract algebraic structure similar to semiring:
+-- it has addition @+@ and multiplication @*@ with their respective units @0@ and @1@.
+-- What differentiates skew semiring is it distinguishes /the order of additions/.
+-- In any semiring, @x + y@ and @y + x@ must be equal; but in a skew semiring they can be
+-- different.
+-- 
+-- Formally, a skew semiring is a set @A@ equipped with two binary operations @(+),(*) :: A -> A -> A@
+-- and two nullary operations @0,1 :: A@, satisfying following equational axioms:
+--
+-- - Addition @(A, (+), 0)@ is a monoid
+--   - @x + (y + z) === (x + y) + z@
+--   - @x + 0 === x === 0 + x@
+-- - Multiplication @(A, (*), 1)@ is a monoid
+--   - @x * (y * z) === (x * y) * z@
+--   - @x * 1 === x === 1 * x@
+-- - Multiplication from right distributes to left addition
+--   - @0 * z === 0@
+--   - @(x + y) * z === (x * z) + (y * z)@
+-- 
+-- Note that both addition @(+)@ and multiplication @(*)@ are not guaranteed to be commutative,
+-- and distributive law is defined only for "one side.""
+-- 
+-- @Rep@ can be thought of as the free skew semiring on one generator @a@,
+-- or in other words the type of normal forms of skew semiring expressions built from
+-- @(+,*,0,1)@ and one variable @a@.
+--
+-- > Rep := 0 | TreeRep + Rep
+-- > TreeRep := 1 | a * Rep
 type Rep = [TreeRep]
 
 -- | Representation of a simple (= not a sum of multiple reps)
