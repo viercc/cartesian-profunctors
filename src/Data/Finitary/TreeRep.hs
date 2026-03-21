@@ -97,18 +97,41 @@ import Data.PTraversable
 --
 -- > Rep := 0 | TreeRep + Rep
 -- > TreeRep := 1 | a * Rep
+--
+-- ==== Why skew semiring, and not a full semiring?
+--
+-- The 'Enum' class assigns every finitary type @x@ a canonical bijection @x ≅ Finite n@,
+-- giving each value a unique index from @0@ to @n-1@. Two types with the same cardinality
+-- are "equal" in the semiring when this bijection is /order-preserving/. Under this notion
+-- of equality, the familiar type constructors satisfy /some/ semiring laws but not all:
+--
+-- [Addition is @Either@]
+--   @Either a b@ encodes all @Left@-values before @Right@-values.
+--   Concatenating the two sequences is order-preserving.
+--
+-- [Multiplication is @(,)@]
+--   @(a, b)@ encodes in row-major (lexicographic) order: @(a₀,b₀),(a₀,b₁),…,(a₁,b₀),…@
+--
+-- [Right distributivity holds]
+--   @(Either a b, c) ≅ Either (a,c) (b,c)@ is order-preserving:
+--   the first @|a|·|c|@ indices map to @Left@, the remaining @|b|·|c|@ to @Right@. ✓
+--
+-- [Left distributivity fails]
+--   @(a, Either b c) ≅ Either (a,b) (a,c)@ is NOT order-preserving in general.
+--   The left side interleaves @b@- and @c@-values as it sweeps through @a@,
+--   whereas the right side puts all @(a,b)@ pairs before all @(a,c)@ pairs. ✗
+--
+-- [Addition is not commutative]
+--   @Either a b ≇ Either b a@ as ordered types: the first puts @a@-values first,
+--   the second puts @b@-values first.
+--
+-- This is exactly the definition of a /skew/ semiring.
+--
+-- Because 'Rep' is the free skew semiring on one generator, 'Eval' @r a@ describes
+-- finitary functors that respect this structure: given any 'Enum' instance for @a@,
+-- 'Eval' @r a@ inherits a canonical 'Enum' instance determined entirely by @r@.
+
 type Rep = [TreeRep]
-
-
-{-
-
-TODO: document /why/ we want to think about skew semiring:
-
-- (Type,Either,(,),Void,()) with order and ≡ as order-preserving iso is a skew semiring
-- Same for (Type,Either,(,),Void,()) with enumeration
-- (Eval r) represents finitary functor /with these structures/
-
--}
 
 -- | Representation of a simple (= not a sum of multiple reps)
 --   finitary functor.
