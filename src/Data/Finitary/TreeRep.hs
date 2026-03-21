@@ -6,8 +6,37 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE RankNTypes #-}
 
-module Data.Finitary.TreeRep where
+module Data.Finitary.TreeRep(
+  -- * Base Type and its algebra
+  Rep, TreeRep(..),
+  addRep, multRep, emptyRep, unitRep,
+
+  -- ** Example representations
+  idRep, maybeRep,
+
+  -- ** Type-level @Rep@ algebra
+  AddRep, MultRep,
+  SRep(..), STreeRep(..),
+  (%++), (%*), sEmptyRep, sUnitRep, sIdRep,
+  KnownRep(..), KnownTreeRep(..),
+  withKnownRep, withKnownTreeRep,
+  
+  -- * Evaluating @Rep@ as a Haskell 'Functor'
+  Eval(..), EvalT(..),
+
+  -- ** Correspondence between sums and products of @Rep@ and its evaluation
+  fromSum, inlEval, inrEval, toSum,
+  fromProduct, toProduct,
+  absurdEval, unitEval,
+
+  -- ** Profunctor traversal
+  ptraverseEval, ptraverseEvalT,
+
+  -- * Building bidirectional encodings as a @Eval r@ with @Profunctor@
+  Encoder(..), idEncoder,
+) where
 
 import Data.Kind (Type)
 
@@ -18,6 +47,7 @@ import Data.Functor.Classes ( Eq1(..), Ord1(..), compare1, eq1 )
 import Data.Profunctor (Profunctor (..))
 import Data.Profunctor.Cartesian
     ( Cartesian(proUnit, (***)), Cocartesian(proEmpty, (+++)) )
+import Data.PTraversable
 
 -- | Representation of a finitary functor.
 --
@@ -59,7 +89,7 @@ import Data.Profunctor.Cartesian
 --   - @(x + y) * z === (x * z) + (y * z)@
 -- 
 -- Note that both addition @(+)@ and multiplication @(*)@ are not guaranteed to be commutative,
--- and distributive law is defined only for "one side.""
+-- and distributive law exists only for one side.
 -- 
 -- @Rep@ can be thought of as the free skew semiring on one generator @a@,
 -- or in other words the type of normal forms of skew semiring expressions built from
@@ -68,6 +98,17 @@ import Data.Profunctor.Cartesian
 -- > Rep := 0 | TreeRep + Rep
 -- > TreeRep := 1 | a * Rep
 type Rep = [TreeRep]
+
+
+{-
+
+TODO: document /why/ we want to think about skew semiring:
+
+- (Type,Either,(,),Void,()) with order and ≡ as order-preserving iso is a skew semiring
+- Same for (Type,Either,(,),Void,()) with enumeration
+- (Eval r) represents finitary functor /with these structures/
+
+-}
 
 -- | Representation of a simple (= not a sum of multiple reps)
 --   finitary functor.
@@ -78,12 +119,19 @@ type Rep = [TreeRep]
 data TreeRep =
     UnitRep
   | ParRep Rep
+  deriving (Eq, Ord, Show)
 
 addRep :: Rep -> Rep -> Rep
 addRep = (++)
 
 multRep :: Rep -> Rep -> Rep
 multRep r1 r2 = concatMap (`multTreeRep` r2) r1
+
+emptyRep :: Rep
+emptyRep = []
+
+unitRep :: Rep
+unitRep = [UnitRep]
 
 multTreeRep :: TreeRep -> Rep -> Rep
 multTreeRep UnitRep r2 = r2
@@ -101,40 +149,118 @@ maybeRep = UnitRep : idRep
 
 -- * Type-level promoted Rep and its singleton reflection
 
+-- | 'addRep' at type level
 type family AddRep (r1 :: Rep) (r2 :: Rep) :: Rep where
   AddRep '[] r2 = r2
   AddRep (t ': r1) r2 = t : AddRep r1 r2
 
+-- | 'multRep' at type level
 type family MultRep (r1 :: Rep) (r2 :: Rep) :: Rep where
   MultRep '[] _ = '[]
   MultRep (UnitRep ': r1) r2 = AddRep r2 (MultRep r1 r2)
   MultRep (ParRep sub1 ': r1) r2 = ParRep (MultRep sub1 r2) ': MultRep r1 r2
 
+-- | Singleton value for type-level @Rep@
 data SRep (r :: Rep) where
   SEmpty :: SRep '[]
-  SCase :: STreeRep t -> SRep r -> SRep (t ': r)
+  SCase :: !(STreeRep t) -> !(SRep r) -> SRep (t ': r)
 
+deriving instance Eq (SRep r)
+deriving instance Ord (SRep r)
+deriving instance Show (SRep r)
+
+-- | Singleton value for type-level @TreeRep@
 data STreeRep (t :: TreeRep) where
   SUnit :: STreeRep 'UnitRep
-  SPar :: SRep r -> STreeRep ('ParRep r)
+  SPar :: !(SRep r) -> STreeRep ('ParRep r)
 
+deriving instance Show (STreeRep t)
+deriving instance Eq (STreeRep r)
+deriving instance Ord (STreeRep r)
+
+-- | Compute the witness of 'AddRep'
 (%++) :: SRep r1 -> SRep r2 -> SRep (AddRep r1 r2)
 SEmpty %++ sr2 = sr2
 SCase st1 sr1 %++ sr2 = SCase st1 (sr1 %++ sr2)
 
+-- | Compute the witness of 'MultRep'
 (%*) :: SRep r1 -> SRep r2 -> SRep (MultRep r1 r2)
 sr1 %* sr2 = case sr1 of
   SEmpty -> SEmpty
   SCase SUnit sr1' -> sr2 %++ (sr1' %* sr2)
   SCase (SPar ssub1) sr1' -> SCase (SPar (ssub1 %* sr2)) (sr1' %* sr2)
 
+sEmptyRep :: SRep '[]
+sEmptyRep = sRep
+
+sUnitRep :: SRep '[ 'UnitRep ]
+sUnitRep = sRep
+
+sIdRep :: SRep '[ 'ParRep '[ 'UnitRep ] ]
+sIdRep = sRep
+
+{-
+
+TODO: promotion and demotion, and document (add,mult) corresponds
+      between (Rep,SRep) using them
+
+withSomeSRep :: Rep -> (forall rep. SRep rep -> result) -> result
+demoteSRep :: SRep rep -> Rep
+
+-}
+
+-- ** Class based singleton value creation
+
+class KnownRep (r :: Rep) where
+  sRep :: SRep r
+
+class KnownTreeRep (t :: TreeRep) where
+  sTreeRep :: STreeRep t
+
+instance KnownRep '[] where
+  sRep = SEmpty
+
+instance (KnownTreeRep t, KnownRep r) => KnownRep (t ': r) where
+  sRep = SCase sTreeRep sRep
+
+instance KnownTreeRep 'UnitRep where
+  sTreeRep = SUnit
+
+instance KnownRep r => KnownTreeRep ('ParRep r) where
+  sTreeRep = SPar sRep
+
+withKnownRep :: SRep r -> (KnownRep r => result) -> result
+withKnownRep SEmpty body = body
+withKnownRep (SCase t r) body =
+  withKnownTreeRep t (withKnownRep r body)
+
+withKnownTreeRep :: STreeRep t -> (KnownTreeRep t => result) -> result
+withKnownTreeRep SUnit body = body
+withKnownTreeRep (SPar r) body = withKnownRep r body
+
+{-
+
+TODO: The current withKnown(Tree)Rep impl. is correct but
+*very* inefficient: it basically tears down and reconstructs the
+same singleton value.
+
+A trick used in @reflection@ packages like this might work:
+
+> newtype Requires c x = MkRequires (c => x)
+> withKnownRep !r body = unsafeCoerce (MkRequires body) r
+
+but I must study about these use of unsafe first.
+
+-}
+
+
 -----------------------------
 
 -- * Interpreting @Rep@ as a real data type
 
 data Eval (r :: Rep) (a :: Type) where
-  EHere :: EvalT t a -> Eval (t ': r) a
-  EThere :: Eval r a -> Eval (t ': r) a
+  EHere :: !(EvalT t a) -> Eval (t ': r) a
+  EThere :: !(Eval r a) -> Eval (t ': r) a
 
 data EvalT (t :: TreeRep) (a :: Type) where
   EUnit :: EvalT 'UnitRep a
@@ -146,9 +272,39 @@ deriving instance Functor (Eval r)
 deriving instance Foldable (Eval r)
 deriving instance Traversable (Eval r)
 
+ptraverseEval :: (Cartesian p, Cocartesian p)
+  => SRep r -> p a b -> p (Eval r a) (Eval r b)
+ptraverseEval r p = case r of
+  SEmpty -> lmap absurdEval proEmpty 
+  SCase t r' -> dimap splitEval mergeEval (ptraverseEvalT t p +++ ptraverseEval r' p)
+  where
+    splitEval :: forall t r c.
+      Eval (t ': r) c -> Either (EvalT t c) (Eval r c)
+    splitEval (EHere x) = Left x
+    splitEval (EThere x) = Right x
+
+    mergeEval :: forall t r c.
+      Either (EvalT t c) (Eval r c) -> Eval (t ': r) c
+    mergeEval = either EHere EThere
+
+ptraverseEvalT :: (Cartesian p, Cocartesian p)
+  => STreeRep t -> p a b -> p (EvalT t a) (EvalT t b)
+ptraverseEvalT t p = case t of
+  SUnit -> rmap (const EUnit) proUnit
+  SPar r -> dimap unEPar (uncurry EPar) (p *** ptraverseEval r p)
+  where
+    unEPar :: forall r c. EvalT (ParRep r) c -> (c, Eval r c)
+    unEPar (EPar a x) = (a,x)
+
+instance KnownRep r => PTraversable (Eval r) where
+  ptraverseWith from to = dimap from to . ptraverseEval sRep
+
 deriving instance Functor (EvalT t)
 deriving instance Foldable (EvalT t)
 deriving instance Traversable (EvalT t)
+
+instance KnownTreeRep t => PTraversable (EvalT t) where
+  ptraverseWith from to = dimap from to . ptraverseEvalT sTreeRep
 
 instance Eq a => Eq (Eval r a) where
   (==) = eq1
@@ -156,6 +312,7 @@ instance Eq a => Eq (Eval r a) where
 instance Eq1 (Eval r) where
   liftEq eq (EHere x) (EHere y) = liftEq eq x y
   liftEq eq (EThere x) (EThere y) = liftEq eq x y
+  -- mismatched constructors
   liftEq _ _ _ = False
 
 instance Eq a => Eq (EvalT t a) where
@@ -170,7 +327,7 @@ instance Ord a => Ord (Eval r a) where
 
 instance Ord1 (Eval r) where
   liftCompare cmp (EHere x) (EHere y) = liftCompare cmp x y
-  liftCompare _   (EHere _) (EThere _) = LT 
+  liftCompare _   (EHere _) (EThere _) = LT
   liftCompare _   (EThere _) (EHere _) = GT
   liftCompare cmp (EThere x) (EThere y) = liftCompare cmp x y
 
@@ -186,8 +343,11 @@ instance Ord1 (EvalT t) where
 absurdEval :: Eval '[] a -> any
 absurdEval x = case x of {}
 
-sumEval :: SRep r1 -> proxy r2 -> Either (Eval r1 x) (Eval r2 x) -> Eval (AddRep r1 r2) x
-sumEval r1 r2 = either (inlEval r1 r2) (inrEval r1 r2)
+unitEval :: Eval '[UnitRep] a
+unitEval = EHere EUnit
+
+fromSum :: SRep r1 -> proxy r2 -> Either (Eval r1 x) (Eval r2 x) -> Eval (AddRep r1 r2) x
+fromSum r1 r2 = either (inlEval r1 r2) (inrEval r1 r2)
 
 inlEval :: SRep r1 -> proxy r2 -> Eval r1 x -> Eval (AddRep r1 r2) x
 inlEval SEmpty _ x = absurdEval x
@@ -199,66 +359,52 @@ inrEval :: SRep r1 -> proxy r2 -> Eval r2 x -> Eval (AddRep r1 r2) x
 inrEval SEmpty _ y = y
 inrEval (SCase _ r1) r2 y = EThere (inrEval r1 r2 y)
 
-evalToSum :: SRep r1 -> proxy r2 -> Eval (AddRep r1 r2) x -> Either (Eval r1 x) (Eval r2 x)
-evalToSum SEmpty _r2 z = Right z
-evalToSum (SCase _ r1) r2 z = case z of
+toSum :: SRep r1 -> proxy r2 -> Eval (AddRep r1 r2) x -> Either (Eval r1 x) (Eval r2 x)
+toSum SEmpty _r2 z = Right z
+toSum (SCase _ r1) r2 z = case z of
   EHere x -> Left (EHere x)
-  EThere z' -> first EThere $ evalToSum r1 r2 z'
+  EThere z' -> first EThere $ toSum r1 r2 z'
 
-prodEval :: SRep r1 -> SRep r2 -> Eval r1 x -> Eval r2 x -> Eval (MultRep r1 r2) x
-prodEval r1 r2 x y = case r1 of
+fromProduct :: SRep r1 -> SRep r2 -> Eval r1 x -> Eval r2 x -> Eval (MultRep r1 r2) x
+fromProduct r1 r2 x y = case r1 of
   SEmpty -> absurdEval x
   SCase SUnit r1' -> case x of
     EHere EUnit -> inlEval r2 (r1' %* r2) y
-    EThere x' -> inrEval r2 (r1' %* r2) (prodEval r1' r2 x' y)
+    EThere x' -> inrEval r2 (r1' %* r2) (fromProduct r1' r2 x' y)
   SCase (SPar sub1) r1' -> case x of
-    EHere (EPar a x') -> EHere (EPar a (prodEval sub1 r2 x' y))
-    EThere x' -> EThere (prodEval r1' r2 x' y)
+    EHere (EPar a x') -> EHere (EPar a (fromProduct sub1 r2 x' y))
+    EThere x' -> EThere (fromProduct r1' r2 x' y)
 
-evalToProd :: SRep r1 -> SRep r2 -> Eval (MultRep r1 r2) x -> (Eval r1 x, Eval r2 x)
-evalToProd r1 r2 z = case r1 of
+toProduct :: SRep r1 -> SRep r2 -> Eval (MultRep r1 r2) x -> (Eval r1 x, Eval r2 x)
+toProduct r1 r2 z = case r1 of
   SEmpty -> absurdEval z
-  SCase SUnit r1' -> case evalToSum r2 (r1' %* r2) z of
+  SCase SUnit r1' -> case toSum r2 (r1' %* r2) z of
     Left y -> (EHere EUnit, y)
-    Right z' -> first EThere $ evalToProd r1' r2 z'
+    Right z' -> first EThere $ toProduct r1' r2 z'
   SCase (SPar sub1) r1' -> case z of
-    EHere (EPar a z') -> first (EHere . EPar a) $ evalToProd sub1 r2 z'
-    EThere z' -> first EThere $ evalToProd r1' r2 z'
-
-fstEval :: SRep r1 -> SRep r2 -> Eval (MultRep r1 r2) x -> Eval r1 x
-fstEval r1 r2 z = case r1 of
-  SEmpty -> absurdEval z
-  SCase SUnit r1' -> case evalToSum r2 (r1' %* r2) z of
-    Left _ -> EHere EUnit
-    Right z' -> EThere $ fstEval r1' r2 z'
-  SCase (SPar sub1) r1' -> case z of
-    EHere (EPar a z') -> EHere . EPar a $ fstEval sub1 r2 z'
-    EThere z' -> EThere $ fstEval r1' r2 z'
-
-sndEval :: SRep r1 -> SRep r2 -> Eval (MultRep r1 r2) x -> Eval r2 x
-sndEval r1 r2 z = case r1 of
-  SEmpty -> absurdEval z
-  SCase SUnit r1' -> case evalToSum r2 (r1' %* r2) z of
-    Left y -> y
-    Right z' -> sndEval r1' r2 z'
-  SCase (SPar sub1) r1' -> case z of
-    EHere (EPar _ z') -> sndEval sub1 r2 z'
-    EThere z' -> sndEval r1' r2 z'
+    EHere (EPar a z') -> first (EHere . EPar a) $ toProduct sub1 r2 z'
+    EThere z' -> first EThere $ toProduct r1' r2 z'
 
 -- * Encoding / Decoding
 
 data Encoder a b s t where
-  Encoder :: SRep r -> (s -> Eval r a) -> (Eval r b -> t) -> Encoder a b s t
+  Encoder :: !(SRep r) -> (s -> Eval r a) -> (Eval r b -> t) -> Encoder a b s t
 
-idEncoding :: Encoder a b a b
-idEncoding = Encoder sIdRep idEnc idDec
+-- | Encoder for the identity functor.
+--
+--   It can be used to construct an encoder for arbitrary 'PTraversable'
+--   functor using @'ptraverse' 'idEncoder'@.
+idEncoder :: Encoder a b a b
+idEncoder = Encoder sIdRep idEnc idDec
   where
-    sIdRep = SCase (SPar (SCase SUnit SEmpty)) SEmpty
     idEnc :: c -> Eval '[ParRep '[UnitRep]] c
-    idEnc c = EHere (EPar c (EHere EUnit))
+    idEnc c = EHere (EPar c unitEval)
+    
     idDec :: Eval '[ParRep '[UnitRep]] c -> c
     idDec (EHere (EPar c _)) = c
-    idDec (EThere rest) = absurdEval rest
+    -- @EThere rest@ case is unnecessary to be
+    -- a complete pattern match, because @rest@ has
+    -- an uninhabited type @Eval '[] c@.
 
 deriving instance Functor (Encoder a b s)
 
@@ -270,13 +416,13 @@ instance Profunctor (Encoder a b) where
 instance Cartesian (Encoder a b) where
   proUnit = Encoder (SCase SUnit SEmpty) (const (EHere EUnit)) (const ())
   (Encoder r1 enc1 dec1) *** (Encoder r2 enc2 dec2) =
-    let enc (s1, s2) = prodEval r1 r2 (enc1 s1) (enc2 s2)
-        dec = bimap dec1 dec2 . evalToProd r1 r2
+    let enc (s1, s2) = fromProduct r1 r2 (enc1 s1) (enc2 s2)
+        dec = bimap dec1 dec2 . toProduct r1 r2
     in Encoder (r1 %* r2) enc dec
 
 instance Cocartesian (Encoder a b) where
   proEmpty = Encoder SEmpty absurd absurdEval
   (Encoder r1 enc1 dec1) +++ (Encoder r2 enc2 dec2) =
     let enc = either (inlEval r1 r2 . enc1) (inrEval r1 r2 . enc2)
-        dec = bimap dec1 dec2 . evalToSum r1 r2
+        dec = bimap dec1 dec2 . toSum r1 r2
     in Encoder (r1 %++ r2) enc dec
