@@ -2,7 +2,7 @@
 
 This package provides three major type classes. Two of them are defined in [Data.Profunctor.Cartesian](src/Data/Profunctor/Cartesian.hs), and the remaining one is defined in [Data.PTraversable](src/Data/PTraversable.hs).
 
-**IMPORTANT:** This library overlaps to these pre-existing libraries _a lot_. See Competing packages section.
+**IMPORTANT:** This library overlaps to pre-existing libraries _a lot_. See Competing packages section.
 
 ## Data.Profunctor.Cartesian
 
