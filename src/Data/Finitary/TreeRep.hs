@@ -82,14 +82,19 @@ import qualified Data.Profunctor.FinFn as FinFn
 -- and two nullary operations @0,1 :: A@, satisfying following equational axioms:
 --
 -- - Addition @(A, (+), 0)@ is a monoid
---   - @x + (y + z) === (x + y) + z@
---   - @x + 0 === x === 0 + x@
+--
+--     > x + (y + z) === (x + y) + z
+--     > x + 0 === x === 0 + x
+--
 -- - Multiplication @(A, (*), 1)@ is a monoid
---   - @x * (y * z) === (x * y) * z@
---   - @x * 1 === x === 1 * x@
+--
+--     > x * (y * z) === (x * y) * z
+--     > x * 1 === x === 1 * x
+--
 -- - Multiplication from right distributes to left addition
---   - @0 * z === 0@
---   - @(x + y) * z === (x * z) + (y * z)@
+--
+--     > 0 * z === 0
+--     > (x + y) * z === (x * z) + (y * z)
 -- 
 -- Note that both addition @(+)@ and multiplication @(*)@ are not guaranteed to be commutative,
 -- and distributive law exists only for one side.
