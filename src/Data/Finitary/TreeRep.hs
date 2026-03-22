@@ -63,19 +63,19 @@ import Data.PTraversable
 -- ==== Theories
 --
 -- @Rep@ can be thought of as a datatype representing
--- a thing called /skew semiring freely generated from one generator/.
+-- a thing called /near-semiring freely generated from one generator/.
 -- 
 -- Semiring is an abstract algebraic structure with addition and multiplication,
 -- but not necessarily have subtraction. Typical instance of semiring is
 -- @Integer@ or @Natural@.
 --
--- Skew semiring is another abstract algebraic structure similar to semiring:
+-- near-semiring is another abstract algebraic structure similar to semiring:
 -- it has addition @+@ and multiplication @*@ with their respective units @0@ and @1@.
--- What differentiates skew semiring is it distinguishes /the order of additions/.
--- In any semiring, @x + y@ and @y + x@ must be equal; but in a skew semiring they can be
+-- What differentiates near-semiring is it distinguishes /the order of additions/.
+-- In any semiring, @x + y@ and @y + x@ must be equal; but in a near-semiring they can be
 -- different.
 -- 
--- Formally, a skew semiring is a set @A@ equipped with two binary operations @(+),(*) :: A -> A -> A@
+-- Formally, a near-semiring is a set @A@ equipped with two binary operations @(+),(*) :: A -> A -> A@
 -- and two nullary operations @0,1 :: A@, satisfying following equational axioms:
 --
 -- - Addition @(A, (+), 0)@ is a monoid
@@ -91,14 +91,14 @@ import Data.PTraversable
 -- Note that both addition @(+)@ and multiplication @(*)@ are not guaranteed to be commutative,
 -- and distributive law exists only for one side.
 -- 
--- @Rep@ can be thought of as the free skew semiring on one generator @a@,
--- or in other words the type of normal forms of skew semiring expressions built from
+-- @Rep@ can be thought of as the free near-semiring on one generator @a@,
+-- or in other words the type of normal forms of near-semiring expressions built from
 -- @(+,*,0,1)@ and one variable @a@.
 --
 -- > Rep := 0 | TreeRep + Rep
 -- > TreeRep := 1 | a * Rep
 --
--- ==== Why skew semiring, and not a full semiring?
+-- ==== Why near-semiring, and not a full semiring?
 --
 -- The 'Enum' class assigns every finitary type @x@ a canonical bijection @x ≅ Finite n@,
 -- giving each value a unique index from @0@ to @n-1@. Two types with the same cardinality
@@ -125,9 +125,9 @@ import Data.PTraversable
 --   @Either a b ≇ Either b a@ as ordered types: the first puts @a@-values first,
 --   the second puts @b@-values first.
 --
--- This is exactly the definition of a /skew/ semiring.
+-- This is exactly the definition of a /near/-semiring.
 --
--- Because 'Rep' is the free skew semiring on one generator, 'Eval' @r a@ describes
+-- Because 'Rep' is the free near-semiring on one generator, 'Eval' @r a@ describes
 -- finitary functors that respect this structure: given any 'Enum' instance for @a@,
 -- 'Eval' @r a@ inherits a canonical 'Enum' instance determined entirely by @r@.
 
