@@ -17,13 +17,6 @@ module Data.Profunctor.Cocartesian.Free(
 
     -- * Newtype wrapper
     ForgetCocartesian(..),
-
-    -- * Utility functions handling product @(,)@ and coproduct @Either@ of
-    --   Haskell types
-
-    assocEither, unassocEither,
-    distL, undistL,
-    distR, undistR
 ) where
 
 import Data.Void (Void, absurd)
@@ -95,13 +88,7 @@ sumF :: FreeCocartesian p a b -> FreeCocartesian p a' b' -> FreeCocartesian p (E
 sumF ps qs = case ps of
   Neutral z -> dimap (either (absurd . z) id) Right qs
   Cons (Day p ps' opA opB) ->
-    Cons $ Day p (sumF ps' qs) (assocEither . first opA) (first opB . unassocEither)
-
-assocEither :: Either (Either a b) c -> Either a (Either b c)
-assocEither = either (second Left) (Right . Right)
-
-unassocEither :: Either a (Either b c) -> Either (Either a b) c
-unassocEither = either (Left . Left) (first Right)
+    Cons $ Day p (sumF ps' qs) (assoc . first opA) (first opB . unassoc)
 
 instance Profunctor p => Cocartesian (FreeCocartesian p) where
     proEmpty = emptyF
@@ -116,24 +103,12 @@ type ProductOp p q r = forall a1 b1 a2 b2. p a1 b1 -> q a2 b2 -> r (a1,a2) (b1,b
 multF :: ProductOp p q r -> FreeCocartesian p a b -> FreeCocartesian q a' b' -> FreeCocartesian r (a,a') (b,b')
 multF _    (Neutral z) _ = lmap (z . fst) emptyF
 multF prod (Cons (Day p ps' opA opB)) qs
-  = dimap (distR . first opA) (first opB . undistR) $
+  = dimap (distL . first opA) (first opB . undistL) $
       sumF (distLeftFree prod p qs) (multF prod ps' qs)
 
 distLeftFree :: ProductOp p q r -> p a b -> FreeCocartesian q a' b' -> FreeCocartesian r (a,a') (b,b')
 distLeftFree _    _ (Neutral z) = lmap (z . snd) emptyF
-distLeftFree prod p (Cons (Day q qs' opA opB)) = Cons $ Day (prod p q) (distLeftFree prod p qs') (distL . second opA) (second opB . undistL)
-
-distR :: (Either a1 a2, b) -> Either (a1, b) (a2, b)
-distR (ea, b) = bimap (, b) (, b) ea
-
-undistR :: Either (a1, b) (a2, b) -> (Either a1 a2, b)
-undistR = either (first Left) (first Right)
-
-distL :: (a, Either b1 b2) -> Either (a, b1) (a, b2)
-distL (a,b) = bimap (a,) (a,) b
-
-undistL :: Either (a, b1) (a, b2) -> (a, Either b1 b2)
-undistL = either (second Left) (second Right)
+distLeftFree prod p (Cons (Day q qs' opA opB)) = Cons $ Day (prod p q) (distLeftFree prod p qs') (distR . second opA) (second opB . undistR)
 
 -- * ProfunctorMonad structures
 

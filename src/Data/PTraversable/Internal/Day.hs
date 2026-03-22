@@ -1,7 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeAbstractions #-}
 
 module Data.PTraversable.Internal.Day (ptraverseDay) where
@@ -75,7 +74,7 @@ instance Profunctor p => Profunctor (ContextT s t p) where
 
 instance Cocartesian p => Cocartesian (ContextT s t p) where
   proEmpty = ContextT $ dimap fst id proEmpty
-  ContextT p +++ ContextT q = ContextT $ dimap distR undistR (p +++ q)
+  ContextT p +++ ContextT q = ContextT $ dimap distL undistL (p +++ q)
 
 -----------
 

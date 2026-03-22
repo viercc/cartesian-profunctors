@@ -21,9 +21,25 @@ module Data.Profunctor.Cartesian(
   describeFinite,
   describeFiniteBits,
 
-  -- * About distributivy laws between 'Cartesian' and 'Cocartesian'
-  --
-  -- $distributivity
+  -- * Laws
+  
+  -- ** 'Cartesian' laws
+  
+  -- $cartesian_laws
+  
+  -- ** 'Cocartesian' laws
+  
+  -- $cocartesian_laws
+  
+  -- ** Optional laws for interaction of @Cartesian@ and @Cocartesian@
+  
+  -- $bicartesian_laws
+
+  -- * Type isomorphisms
+  -- ** Re-exports
+  Assoc(..), Swap(..),
+  -- ** Distributivity 
+  distL, undistL, distR, undistR,
 ) where
 
 import Control.Applicative
@@ -32,6 +48,7 @@ import Data.Void
 
 import Data.Functor.Contravariant.Divisible
 import Data.Bifunctor(Bifunctor(..))
+import Data.Bifunctor.Assoc ( Assoc(..) )
 import Data.Bifunctor.Clown
 import Data.Bifunctor.Joker
 import Data.Bifunctor.Product
@@ -45,6 +62,7 @@ import Data.Bits
 import GHC.TypeNats ( KnownNat, Natural, natVal )
 import Data.Finite (Finite, getFinite, finites)
 import Data.Finite.Internal qualified as Unsafe
+import Data.Bifunctor.Swap (Swap(..))
 
 class Profunctor p => Cartesian p where
   {-# MINIMAL proUnit, (proProduct | (***) | (&&&)) #-}
@@ -77,6 +95,35 @@ class Profunctor p => Cartesian p where
   -- There is a default implementaion, but it can be more efficient implementation.
   proPower :: KnownNat n => p a b -> p (Finite n -> a) (Finite n -> b)
   proPower p = runPower describeFinite p
+
+{- $cartesian_laws
+
+Instances of 'Cartesian' must satisfy the following equations.
+
+[Left unit of @'***'@]
+  @dimap unitL' unitL ('proUnit' *** p) === p@, where
+  @unitL' = ((),) :: a -> ((), a); unitL = snd :: ((),a) -> a@
+
+[Right unit of @***@]
+  @dimap unitR' unitR (p *** 'proUnit') === p@, where
+  @unitR' = (,()) :: a -> (a,()); unitR = fst :: (a,()) -> a@
+
+[Associativity of @***@]
+  @dimap 'assoc' 'unassoc' ((p *** q) *** r) === p *** (q *** r)@
+
+Some instance of @Cartesian@ optionally satisfy the following equation.
+
+[Commutativity of @***@]
+  @dimap 'Data.Bifunctor.Swap.swap' swap (p *** q) === q *** p@
+
+In this library, an instance of @Cartesian@ is called commutative @Cartesian@
+if it satisfy the above /commutativity/ law.
+
+==== Instances with and without commutativity
+
+TODO fill here: most instance is not commutative, @Counting@ or @Forget r@ for commutative monoid is (positive)
+
+-}
 
 delta :: a -> (a,a)
 delta a = (a,a)
@@ -172,6 +219,36 @@ class Profunctor p => Cocartesian p where
   proTimes :: KnownNat n => p a b -> p (Finite n, a) (Finite n, b)
   proTimes = runCopower describeFinite
 
+{- $cocartesian_laws
+
+Instances of 'Cocartesian' must satisfy the following equations.
+
+[Left unit of @'+++'@]
+  @dimap unitL' unitL ('proEmpty' +++ p) === p@, where
+  @unitL' = Right :: a -> Either Void a; unitL = either 'absurd' id :: Either Void a -> a@
+
+[Right unit of @+++@]
+  @dimap unitR' unitR (p +++ 'proEmpty') === p@, where
+  @unitR' = Left :: a -> Either a Void; unitR = either id 'absurd' :: Either a Void -> a@
+
+[Associativity of @+++@]
+  @dimap 'assoc' 'unassoc' ((p +++ q) +++ r) === p +++ (q +++ r)@
+
+Some instance of @Cocartesian@ optionally satisfy the following equation.
+
+[Commutativity of @+++@]
+  @dimap 'swap' swap (p +++ q) === q +++ p@
+
+In this library, an instance of @Cocartesian@ is called commutative @Cocartesian@
+if it satisfy the above /commutativity/ law.
+
+==== Instances with and without commutativity
+
+TODO fill here: @Star f@, @Clown Equivalence@ (positive) and
+  @Clown Comparison@, @Alternative f => Joker f@ (negative)
+
+-}
+
 nabla :: Either a a -> a
 nabla = either id id
 
@@ -222,6 +299,65 @@ instance (Cocartesian p) => Cocartesian (Coyoneda p) where
   Coyoneda l1 r1 p +++ Coyoneda l2 r2 q
     = Coyoneda (l1 +++ l2) (r1 +++ r2) (p +++ q)
 
+{- $bicartesian_laws
+
+If a @Profunctor p@ is an instance of both @Cartesian@ and @Cocartesian@,
+there are few named properties they optionally satisfy.
+
+[Left absorption]
+  @dimap absurd (absurd . fst) (proEmpty *** p) === proEmpty@
+
+[Left distribution]
+  @dimap undistL distL ((p +++ q) *** r) === (p *** r) +++ (q *** r)@, where
+  @'distL', 'undistL'@ are defined below
+
+[Right absorption]
+  @dimap absurd (absurd . snd) (p *** proEmpty) === proEmpty@
+
+[Right distribution]
+  @dimap undistR distR (r *** (p +++ q)) === (r *** p) +++ (r *** q)@, where
+  @'distR', 'undistR'@ are defined below
+
+In this library, an instance of both @Cartesian@ and @Cocartesian@ is called
+
+- near-Bicartesian if it additionally satisfy /Left absorption/ and /Left distribution/
+- Bicartesian if it is near-Bicartesian, is /commutative/ @Cocartesian@, and satisfy all four of
+  /Right absorption/ and /Right distribution/. In other words,
+  satisfy all of above four laws and commutativity of @+++@.
+
+==== Instances with/without optional properties
+
+TODO fill here
+
+==== Note:
+
+In usual mathematical abstract algebra context,
+it is common practice to name /Right distributivity/ to mean
+Left absorption and Left distibution combined,
+and same switching for /Left distributivity/.
+
+The naming convention of this library came from /Haskell/ convention
+of describing distributive properties of 'Control.Applicative.Alternative'
+and 'Control.Monad.MonadPlus'.
+
+<https://wiki.haskell.org/index.php?title=Typeclassopedia#Laws_6>
+
+-}
+
+distL :: (Either a b, c) -> Either (a,c) (b,c)
+distL (Left a, c) = Left (a,c)
+distL (Right b, c) = Right (b,c)
+
+undistL :: Either (a,c) (b,c) -> (Either a b, c)
+undistL (Left (a,c)) = (Left a, c)
+undistL (Right (b,c)) = (Right b, c)
+
+distR :: (c, Either a b) -> Either (c,a) (c,b)
+distR = bimap swap swap . distL . swap
+
+undistR :: Either (c,a) (c,b) -> (c, Either a b)
+undistR = swap . undistL . bimap swap swap
+
 --
 
 newtype Power p a b = Power { runPower :: forall s t. p s t -> p (b -> s) (a -> t) }
@@ -248,11 +384,6 @@ instance Profunctor p => Profunctor (Copower p) where
 instance Profunctor p => Cartesian (Copower p) where
   proUnit = Copower $ \p -> dimap snd ((),) p
   cp *** cq = Copower $ \p -> dimap assoc unassoc $ runCopower cp (runCopower cq p)
-
-assoc :: ((a1, a2), b) -> (a1, (a2, b))
-assoc ((a,b),c) = (a,(b,c))
-unassoc :: (a, (b1, b2)) -> ((a, b1), b2)
-unassoc (a,(b,c)) = ((a,b),c)
 
 instance Cocartesian p => Cocartesian (Copower p) where
   proEmpty = Copower $ \_ -> dimap fst absurd proEmpty
