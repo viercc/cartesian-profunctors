@@ -179,26 +179,33 @@ interact. There are two natural distributivity laws; they are **not symmetric**.
 Define the four structural maps:
 
 ```haskell
-distR   :: (Either a a', b) -> Either (a,b) (a',b)
-distR (ea, b) = bimap (,b) (,b) ea
+distL   :: (Either a b, c) -> Either (a,c) (b,c)   -- sum on the left of (***)
+distL (Left a,  c) = Left  (a, c)
+distL (Right b, c) = Right (b, c)
 
-undistR :: Either (a,b) (a',b) -> (Either a a', b)
-undistR = either (first Left) (first Right)
+undistL :: Either (a,c) (b,c) -> (Either a b, c)
+undistL (Left  (a, c)) = (Left  a, c)
+undistL (Right (b, c)) = (Right b, c)
 
-distL   :: (a, Either b b') -> Either (a,b) (a,b')
-distL (a, eb) = bimap (a,) (a,) eb
+distR   :: (c, Either a b) -> Either (c,a) (c,b)   -- sum on the right of (***)
+distR   = bimap swap swap . distL . swap
 
-undistL :: Either (a,b) (a,b') -> (a, Either b b')
-undistL = either (second Left) (second Right)
+undistR :: Either (c,a) (c,b) -> (c, Either a b)
+undistR = swap . undistL . bimap swap swap
 ```
 
-### Right distributivity
+The L/R suffix refers to which side of `(***)` the sum sits on.  This follows
+the Haskell convention used for `Alternative` laws in Typeclassopedia, which
+differs from the usual mathematical convention (see the Note in
+`Data.Profunctor.Cartesian`).
+
+### Left distribution
 
 ```
-dimap distR undistR ((p +++ q) *** r)  =  (p *** r) +++ (q *** r)
+dimap undistL distL ((p +++ q) *** r)  =  (p *** r) +++ (q *** r)
 ```
 
-In a near-semiring, this is `(x + y) * z = (x * z) + (y * z)`.
+Sum is on the **left** of `(***)`.  In a near-semiring: `(x + y) * z = xz + yz`.
 
 This law is used centrally in `FreeCocartesian`'s `Cartesian` instance (see
 `multF`), but it **does not hold for all instances**.
@@ -208,32 +215,30 @@ Counterexamples:
 - **`Joker IO`**: for `Joker f` the law reduces to
   `liftA2 f (x <|> y) z  =  liftA2 f x z <|> liftA2 f y z`,
   i.e., `<*>` distributes from the left over `<|>`.  For `IO` (with
-  exception-based `<|>`), the right operand `z` is sequenced after the sum
-  part; on the RHS `z` may be executed in *both* branches before the `<|>`
-  selects one, so the two sides can diverge on effects.
+  exception-based `<|>`), the right operand `z` may be executed in *both*
+  branches before the `<|>` selects one, so the two sides can diverge on
+  effects.
 
 - **`ArrowChoice a`** (viewed as `Cartesian`/`Cocartesian`): `(***)` is
   defined as `first p >>> second q` and `(+++)` as `left p >>> right q`,
-  using `Category` composition `>>>`.  On the LHS the sum `p +++ q` is formed
-  first and then paired with `r`; on the RHS `r` is paired independently
-  inside each branch.  The two sides sequence effects in different orders and
-  are not equal in general.
+  using `Category` composition `>>>`.  The two sides sequence effects in
+  different orders and are not equal in general.
 
 Note: `Joker []` and `Joker (Either e)` (with the standard `Alternative`
-instances) *do* satisfy right distributivity, because `<*>` for lists and
+instances) *do* satisfy left distribution, because `<*>` for lists and
 `Either` distributes cleanly over `<|>` from the left.
 
-### Left distributivity
+### Right distribution
 
 ```
-dimap distL undistL (p *** (q +++ r))  =  (p *** q) +++ (p *** r)
+dimap undistR distR (r *** (p +++ q))  =  (r *** p) +++ (r *** q)
 ```
 
-In a near-semiring, this would be `x * (y + z) = (x * y) + (x * z)`.
+Sum is on the **right** of `(***)`.  In a semiring: `x * (y + z) = xy + xz`.
 
 This law **does not hold in general**.  The canonical counterexample is
-`Joker []`, because `<*>` for lists does not distribute from the right over
-`<|>`:
+`Joker []`, because `<*>` for lists does not distribute over `<|>` from the
+right:
 
 ```haskell
 let x = [id, id]; y = [1]; z = [2]
@@ -241,7 +246,7 @@ x <*> (y <|> z)         -- [1,2,1,2]
 (x <*> y) <|> (x <*> z) -- [1,1,2,2]
 ```
 
-`ArrowChoice` similarly fails left distributivity.
+`ArrowChoice` similarly fails right distribution.
 
 ### Recommendation
 
@@ -252,15 +257,15 @@ model was originally motivated by right distributivity holding, but the
 The practical consequence is:
 
 - `FreeCocartesian`'s `Cartesian` instance (`multF`) actually uses **both**
-  left and right distributivity internally: it repeatedly expands
-  `p *** (q +++ r)` into `(p *** q) +++ (p *** r)` (left) and
-  `(p +++ q) *** r` into `(p *** r) +++ (q *** r)` (right), producing a
-  flat formal sum of products — a polynomial normal form.  Feeding this
-  back into an outer `p` via `foldFree` is only semantically correct if the
-  outer `p`'s `(+++)` is commutative (so the order of the expanded terms does
-  not matter).  `FreeCocartesian` is therefore best suited to interpreting into
-  profunctors with symmetric `(+++)`.
-- Both distributivity laws are best treated as **optional, stronger
+  left and right distribution internally: it repeatedly expands
+  `r *** (p +++ q)` into `(r *** p) +++ (r *** q)` (right distribution) and
+  `(p +++ q) *** r` into `(p *** r) +++ (q *** r)` (left distribution),
+  producing a flat formal sum of products — a polynomial normal form.  Feeding
+  this back into an outer `p` via `foldFree` is only semantically correct if
+  the outer `p`'s `(+++)` is commutative (so the order of the expanded terms
+  does not matter).  `FreeCocartesian` is therefore best suited to interpreting
+  into profunctors with symmetric `(+++)`.
+- Both distribution laws are best treated as **optional, stronger
   conditions** that some instances satisfy and others do not, rather than
   universal laws of `Cartesian`/`Cocartesian`.
 
@@ -273,22 +278,22 @@ In a near-semiring, `0 * x = 0`. In a semiring, `x * 0 = 0` additionaly. The pro
 ### Left absorption
 
 ```
-proEmpty *** p  =  dimap fst absurd proEmpty
+dimap absurd (absurd . fst) (proEmpty *** p)  =  proEmpty
 ```
 
-`proEmpty *** p :: p (Void, a) (Void, b)`.  The right-hand side
-`dimap fst absurd proEmpty` re-tags the input/output with `fst` and `absurd`.
-The law says the product must collapse to `proEmpty` whenever the left factor
-has an uninhabited domain.
+`proEmpty *** p :: p (Void, a) (Void, b)`.  `absurd :: Void -> (Void, a)` feeds
+in a (vacuous) input, and `absurd . fst :: (Void, b) -> c` extracts the
+(vacuous) output.  The law says the product collapses to `proEmpty` whenever
+`proEmpty` is the left factor.  In a near-semiring: `0 * x = 0`.
 
 ### Right absorption
 
 ```
-p *** proEmpty  =  dimap snd absurd proEmpty
+dimap absurd (absurd . snd) (p *** proEmpty)  =  proEmpty
 ```
 
-`p *** proEmpty :: p (a, Void) (b, Void)`.  Here `snd :: (a, Void) -> Void` and
-`absurd :: Void -> (b, Void)`.
+`p *** proEmpty :: p (a, Void) (b, Void)`.  Dual: `proEmpty` is the right
+factor.  In a semiring: `x * 0 = 0`.
 
 ### Discussion
 
@@ -301,10 +306,9 @@ than producing some unrelated element of `p Void b`.
 
 For `(->)` the laws hold because `Void -> b` is indeed a singleton (`absurd` is
 the only inhabitant), so equality is forced.  For `Star f`, the laws hold because
-`f` can never be invoked on an uninhabited type, giving `pure absurd` in both
-cases.  For `Joker f`, left absorption requires `liftA2 (,) empty fa = empty`,
-which is an `Alternative` law; so it holds for law-abiding `Alternative`
-instances.
+`f` can never be invoked on an uninhabited type.  For `Joker f`, left absorption
+requires `liftA2 (,) empty fa = empty`, which is an `Alternative` law; so it
+holds for law-abiding `Alternative` instances.
 
 Whether to **formally impose** absorption laws is an open question.  They hold
 for all current instances, but verifying them requires reasoning about the
@@ -326,8 +330,8 @@ is unrelated to `proUnit :: p a ()`, and there is no law connecting them.
 | `Cocartesian` associativity | **Required** | Monoidal coherence |
 | `Cartesian` commutativity (`swap`) | **Not required** | Breaks `TreeRep`, ordered instances |
 | `Cocartesian` commutativity (`swap`) | **Not required** | Same reasons |
-| Right distributivity of `(***)` over `(+++)` | **Optional** | Fails for `Joker IO`, `ArrowChoice`; required by `FreeCocartesian` |
-| Left distributivity of `(***)` over `(+++)` | **Optional** | Fails for `Joker []`, `ArrowChoice` |
+| Left distribution (`(p +++ q) *** r`) | **Optional** | Fails for `Joker IO`, `ArrowChoice`; required by `FreeCocartesian` |
+| Right distribution (`r *** (p +++ q)`) | **Optional** | Fails for `Joker []`, `ArrowChoice` |
 | Absorption (`proEmpty *** p = ...`) | **Guideline only** | It is an independent condition (Absorption-only breakage is possible) actually, but all current instances satisfy. Most of the common usage will not violate. |
 
 ---
@@ -352,11 +356,11 @@ instance satisfying the laws above.
 
 ## VII. Open Questions
 
-1. **Should distributivity be captured as a separate class?**
-   Since neither distributivity law holds universally, one option is a separate
-   class (e.g. `RightDistributive p`) for instances that do satisfy it,
-   allowing `FreeCocartesian`'s `Cartesian` instance to require it as a
-   constraint.
+1. **Should distribution be captured as a separate class?**
+   Since neither distribution law holds universally, one option is a separate
+   class (e.g. `LeftDistribution p`) for instances that do satisfy left
+   distribution, allowing `FreeCocartesian`'s `Cartesian` instance to require
+   it as a constraint.
 
 2. **A free `Bicartesian` for the commutative/symmetric case.**
    `FreeCocartesian p` carries an ordered sum, but its `Cartesian` instance
