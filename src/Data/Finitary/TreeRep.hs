@@ -48,6 +48,9 @@ import Data.Profunctor (Profunctor (..))
 import Data.Profunctor.Cartesian
     ( Cartesian(proUnit, (***)), Cocartesian(proEmpty, (+++)) )
 import Data.PTraversable
+import Data.Finitary.Enum
+import Prelude hiding (Enum)
+import qualified Data.Profunctor.FinFn as FinFn
 
 -- | Representation of a finitary functor.
 --
@@ -127,9 +130,9 @@ import Data.PTraversable
 --
 -- This is exactly the definition of a /near/-semiring.
 --
--- Because 'Rep' is the free near-semiring on one generator, 'Eval' @r a@ describes
+-- Because 'Rep' is the free near-semiring on one generator, @'Eval' r a@ describes
 -- finitary functors that respect this structure: given any 'Enum' instance for @a@,
--- 'Eval' @r a@ inherits a canonical 'Enum' instance determined entirely by @r@.
+-- @'Eval' r a@ inherits a canonical 'Enum' instance determined entirely by @r@.
 
 type Rep = [TreeRep]
 
@@ -322,12 +325,20 @@ ptraverseEvalT t p = case t of
 instance KnownRep r => PTraversable (Eval r) where
   ptraverseWith from to = dimap from to . ptraverseEval sRep
 
+instance (KnownRep r, Enum a) => Enum (Eval r a) where
+  enumeration = ptraverse enumeration
+  withEnum = FinFn.withFinFn enumeration
+
 deriving instance Functor (EvalT t)
 deriving instance Foldable (EvalT t)
 deriving instance Traversable (EvalT t)
 
 instance KnownTreeRep t => PTraversable (EvalT t) where
   ptraverseWith from to = dimap from to . ptraverseEvalT sTreeRep
+
+instance (KnownTreeRep t, Enum a) => Enum (EvalT t a) where
+  enumeration = ptraverse enumeration
+  withEnum = FinFn.withFinFn enumeration
 
 instance Eq a => Eq (Eval r a) where
   (==) = eq1
