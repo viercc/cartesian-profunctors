@@ -13,15 +13,13 @@ module Data.Profunctor.Cartesian.Free(
 
     -- * Newtype wrapper
     ForgetCartesian(..),
-
-    -- * Utility functions
-    assocTup, unassocTup,
 ) where
 
 import Data.Profunctor (Profunctor(..), (:->))
-import Data.Profunctor.Cartesian
 import Data.Bifunctor (Bifunctor(..))
 import Data.Profunctor.Monad
+
+import Data.Profunctor.Cartesian
 import Data.Profunctor.Day
 
 -- * The free 'Cartesian' profunctor
@@ -43,13 +41,7 @@ instance Profunctor (FreeCartesian p) where
 instance Cartesian (FreeCartesian p) where
     proUnit = Neutral ()
     Neutral b *** qs = dimap snd (b,) qs
-    Cons (Day p ps opA opB) *** qs = Cons $ Day p (ps *** qs) (assocTup . first opA) (first opB . unassocTup)
-
-assocTup :: ((a,b), c) -> (a, (b,c))
-assocTup ((a,b), c) = (a, (b,c))
-
-unassocTup :: (a, (b,c)) ->  ((a,b), c)
-unassocTup (a, (b,c)) = ((a,b), c)
+    Cons (Day p ps opA opB) *** qs = Cons $ Day p (ps *** qs) (assoc . first opA) (first opB . unassoc)
 
 liftF :: p :-> FreeCartesian p
 liftF p = Cons $ Day p proUnit (, ()) fst

@@ -1,6 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeOperators #-}
@@ -14,6 +13,7 @@ module Data.Profunctor.Cocartesian.Free(
 
     -- ** Distributive 'Cartesian' on @FreeCocartesian p@
     multF,
+    ProductOp,
 
     -- * Newtype wrapper
     ForgetCocartesian(..),

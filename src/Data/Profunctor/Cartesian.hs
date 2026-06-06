@@ -38,6 +38,9 @@ module Data.Profunctor.Cartesian(
   -- * Type isomorphisms
   -- ** Re-exports
   Assoc(..), Swap(..),
+  -- ** Unit laws
+  unitL, ununitL, unitR, ununitR,
+  emptyL, unemptyL, emptyR, unemptyR,
   -- ** Distributivity 
   distL, undistL, distR, undistR,
 ) where
@@ -49,6 +52,7 @@ import Data.Void
 import Data.Functor.Contravariant.Divisible
 import Data.Bifunctor(Bifunctor(..))
 import Data.Bifunctor.Assoc ( Assoc(..) )
+import Data.Bifunctor.Swap (Swap(..))
 import Data.Bifunctor.Clown
 import Data.Bifunctor.Joker
 import Data.Bifunctor.Product
@@ -62,7 +66,6 @@ import Data.Bits
 import GHC.TypeNats ( KnownNat, Natural, natVal )
 import Data.Finite (Finite, getFinite, finites)
 import Data.Finite.Internal qualified as Unsafe
-import Data.Bifunctor.Swap (Swap(..))
 
 class Profunctor p => Cartesian p where
   {-# MINIMAL proUnit, (proProduct | (***) | (&&&)) #-}
@@ -94,19 +97,17 @@ class Profunctor p => Cartesian p where
   --
   -- There is a default implementaion, but it can be more efficient implementation.
   proPower :: KnownNat n => p a b -> p (Finite n -> a) (Finite n -> b)
-  proPower p = runPower describeFinite p
+  proPower = runPower describeFinite
 
 {- $cartesian_laws
 
 Instances of 'Cartesian' must satisfy the following equations.
 
 [Left unit of @'***'@]
-  @dimap unitL' unitL ('proUnit' *** p) === p@, where
-  @unitL' = ((),) :: a -> ((), a); unitL = snd :: ((),a) -> a@
+  @dimap 'ununitL' 'unitL' ('proUnit' *** p) === p@
 
 [Right unit of @***@]
-  @dimap unitR' unitR (p *** 'proUnit') === p@, where
-  @unitR' = (,()) :: a -> (a,()); unitR = fst :: (a,()) -> a@
+  @dimap 'ununitR' 'unitR' (p *** 'proUnit') === p@
 
 [Associativity of @***@]
   @dimap 'assoc' 'unassoc' ((p *** q) *** r) === p *** (q *** r)@
@@ -224,12 +225,10 @@ class Profunctor p => Cocartesian p where
 Instances of 'Cocartesian' must satisfy the following equations.
 
 [Left unit of @'+++'@]
-  @dimap unitL' unitL ('proEmpty' +++ p) === p@, where
-  @unitL' = Right :: a -> Either Void a; unitL = either 'absurd' id :: Either Void a -> a@
+  @dimap 'unemptyL' 'emptyL' ('proEmpty' +++ p) === p@
 
 [Right unit of @+++@]
-  @dimap unitR' unitR (p +++ 'proEmpty') === p@, where
-  @unitR' = Left :: a -> Either a Void; unitR = either id 'absurd' :: Either a Void -> a@
+  @dimap 'unemptyR' 'emptyR' (p +++ 'proEmpty') === p@
 
 [Associativity of @+++@]
   @dimap 'assoc' 'unassoc' ((p +++ q) +++ r) === p +++ (q +++ r)@
@@ -308,15 +307,13 @@ there are few named properties they optionally satisfy.
   @dimap absurd (absurd . fst) (proEmpty *** p) === proEmpty@
 
 [Left distribution]
-  @dimap undistL distL ((p +++ q) *** r) === (p *** r) +++ (q *** r)@, where
-  @'distL', 'undistL'@ are defined below
+  @dimap 'undistL' 'distL' ((p +++ q) *** r) === (p *** r) +++ (q *** r)@
 
 [Right zero]
   @dimap absurd (absurd . snd) (p *** proEmpty) === proEmpty@
 
 [Right distribution]
-  @dimap undistR distR (r *** (p +++ q)) === (r *** p) +++ (r *** q)@, where
-  @'distR', 'undistR'@ are defined below
+  @dimap 'undistR' 'distR' (r *** (p +++ q)) === (r *** p) +++ (r *** q)@
 
 In this library, an instance of both @Cartesian@ and @Cocartesian@ is called
 
@@ -343,6 +340,30 @@ and 'Control.Monad.MonadPlus'.
 <https://wiki.haskell.org/index.php?title=Typeclassopedia#Laws_6>
 
 -}
+
+unitL :: ((),a) -> a
+unitL = snd
+
+ununitL :: a -> ((), a)
+ununitL = ((),)
+
+unitR :: (a,()) -> a
+unitR = fst
+
+ununitR :: a -> (a, ())
+ununitR = (,())
+
+emptyL :: Either Void a -> a
+emptyL = either absurd id
+
+unemptyL :: a -> Either Void a
+unemptyL = Right
+
+emptyR :: Either a Void -> a
+emptyR = either id absurd
+
+unemptyR :: a -> Either a Void
+unemptyR = Left
 
 distL :: (Either a b, c) -> Either (a,c) (b,c)
 distL (Left a, c) = Left (a,c)
