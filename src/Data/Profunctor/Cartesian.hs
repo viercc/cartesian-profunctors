@@ -304,14 +304,14 @@ instance (Cocartesian p) => Cocartesian (Coyoneda p) where
 If a @Profunctor p@ is an instance of both @Cartesian@ and @Cocartesian@,
 there are few named properties they optionally satisfy.
 
-[Left absorption]
+[Left zero]
   @dimap absurd (absurd . fst) (proEmpty *** p) === proEmpty@
 
 [Left distribution]
   @dimap undistL distL ((p +++ q) *** r) === (p *** r) +++ (q *** r)@, where
   @'distL', 'undistL'@ are defined below
 
-[Right absorption]
+[Right zero]
   @dimap absurd (absurd . snd) (p *** proEmpty) === proEmpty@
 
 [Right distribution]
@@ -320,9 +320,9 @@ there are few named properties they optionally satisfy.
 
 In this library, an instance of both @Cartesian@ and @Cocartesian@ is called
 
-- near-Bicartesian if it additionally satisfy /Left absorption/ and /Left distribution/
+- near-Bicartesian if it additionally satisfy /Left zero/ and /Left distribution/
 - Bicartesian if it is near-Bicartesian, is /commutative/ @Cocartesian@, and satisfy all four of
-  /Right absorption/ and /Right distribution/. In other words,
+  /Right zero/ and /Right distribution/. In other words,
   satisfy all of above four laws and commutativity of @+++@.
 
 ==== Instances with/without optional properties
@@ -333,7 +333,7 @@ TODO fill here
 
 In usual mathematical abstract algebra context,
 it is common practice to name /Right distributivity/ to mean
-Left absorption and Left distibution combined,
+Left zero and Left distibution combined,
 and same switching for /Left distributivity/.
 
 The naming convention of this library came from /Haskell/ convention
