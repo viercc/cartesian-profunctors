@@ -16,9 +16,7 @@ module Data.Profunctor.Cartesian.Free(
 ) where
 
 import Data.Profunctor (Profunctor(..), (:->))
-import Data.Bifunctor (Bifunctor(..))
 import Data.Profunctor.Monad
-
 import Data.Profunctor.Cartesian
 import Data.Profunctor.Day
 
@@ -38,10 +36,13 @@ instance Profunctor (FreeCartesian p) where
   dimap _ g (Neutral b) = Neutral (g b)
   dimap f g (Cons ps')  = Cons (dimap f g ps')
 
+prodDayF :: Day (,) (FreeCartesian p) (FreeCartesian p) :-> FreeCartesian p
+prodDayF (Day (Neutral b) qs opA opB) = dimap (snd . opA) (curry opB b) qs
+prodDayF (Day (Cons ps) qs opA opB) = Cons $ promap2 prodDayF $ assocDay (Day ps qs opA opB)
+
 instance Cartesian (FreeCartesian p) where
     proUnit = Neutral ()
-    Neutral b *** qs = dimap snd (b,) qs
-    Cons (Day p ps opA opB) *** qs = Cons $ Day p (ps *** qs) (assoc . first opA) (first opB . unassoc)
+    proProduct opA opB p q = prodDayF (Day p q opA opB)
 
 liftF :: p :-> FreeCartesian p
 liftF p = Cons $ Day p proUnit (, ()) fst

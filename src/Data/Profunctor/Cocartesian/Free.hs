@@ -84,15 +84,16 @@ instance ProfunctorFunctor FreeCocartesian where
 emptyF :: FreeCocartesian p Void b
 emptyF = Neutral id
 
+sumDayF :: Day Either (FreeCocartesian p) (FreeCocartesian p) :-> FreeCocartesian p
+sumDayF (Day (Neutral z) qs opA opB) = dimap (either (absurd . z) id . opA) (opB . Right) qs
+sumDayF (Day (Cons ps) qs opA opB) = Cons $ promap2 sumDayF $ assocDay (Day ps qs opA opB)
+
 sumF :: FreeCocartesian p a b -> FreeCocartesian p a' b' -> FreeCocartesian p (Either a a') (Either b b')
-sumF ps qs = case ps of
-  Neutral z -> dimap (either (absurd . z) id) Right qs
-  Cons (Day p ps' opA opB) ->
-    Cons $ Day p (sumF ps' qs) (assoc . first opA) (first opB . unassoc)
+sumF ps qs = sumDayF (Day ps qs id id)
 
 instance Profunctor p => Cocartesian (FreeCocartesian p) where
     proEmpty = emptyF
-    (+++) = sumF
+    proSum opA opB ps qs = sumDayF (Day ps qs opA opB)
 
 instance Cartesian p => Cartesian (FreeCocartesian p) where
     proUnit = liftF proUnit
