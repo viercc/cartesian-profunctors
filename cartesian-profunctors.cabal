@@ -16,13 +16,16 @@ library
     Data.Profunctor.Cartesian,
     Data.Profunctor.Cartesian.Free,
     Data.Profunctor.Cocartesian.Free,
+    Data.Profunctor.Bicartesian.Free,
     Data.Profunctor.Counting,
     Data.Profunctor.FinFn,
     Data.Profunctor.Exhaust,
     Data.Profunctor.UniconEncoding,
     Data.Finitary.Enum,
     Data.PTraversable,
-    Data.Finitary.TreeRep
+    Data.Finitary.TreeRep,
+    Data.Finitary.PolyRep,
+    Data.List.TypeLevel
   other-modules:
     Data.PTraversable.Internal.Day,
     Data.Profunctor.Extra,
@@ -41,7 +44,6 @@ library
     , vector ^>=0.13.2.0
     , transformers
     , containers
-    , vector
 
     -- Advanced data types
     , kan-extensions
@@ -49,7 +51,7 @@ library
     -- Type level programming
     , finite-typelits >= 0.2.1.0
     , finitary >= 2.1.3.0
-    , vector-sized
+    , typelits-witnesses
     , ghc-typelits-knownnat
   ghc-options:         -Wall -Werror -Wcompat
   default-language:    Haskell2010

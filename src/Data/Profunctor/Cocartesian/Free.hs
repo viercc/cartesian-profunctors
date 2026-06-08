@@ -9,11 +9,7 @@ module Data.Profunctor.Cocartesian.Free(
     -- * The free 'Cocartesian' profunctors
     FreeCocartesian(..),
     liftF, foldFree,
-    emptyF, sumF,
-
-    -- ** Distributive 'Cartesian' on @FreeCocartesian p@
-    multF,
-    ProductOp,
+    emptyF, sumF, sumDayF,
 
     -- * Newtype wrapper
     ForgetCocartesian(..),
@@ -22,54 +18,17 @@ module Data.Profunctor.Cocartesian.Free(
 import Data.Void (Void, absurd)
 import Data.Profunctor (Profunctor(..), (:->))
 import Data.Profunctor.Cartesian
-import Data.Bifunctor (Bifunctor(..))
 import Data.Profunctor.Monad
 import Data.Profunctor.Day
 
 -- * Free Cocartesian
 
--- | Free Cocartesian profunctor is 'FreeMonoidal' profunctor with respect to
---   @Either@.
--- 
--- ==== Caution about 'Cartesian' instance
--- 
--- Note that @'FreeCocartesian' p@ have an instance of 'Cartesian', by distributing
--- product on sums to sum of products of individual profunctors.
--- When it is desirable to disable @Cartesian@ instance of @FreeCocartesian p@,
--- use 'Data.Profunctor.Cartesian.Free.ForgetCartesian' to ignore @Cartesian@ instance of @p@.
---
--- Because there are some profunctors which are both @Cartesian@ and @Cocartesian@
--- but do not satisfy distributive laws,
--- using 'FreeCocartesian' with such profunctors might cause a surprising behavior.
---
--- For example, @'Data.Bifunctor.Joker.Joker' []@ is not distributive,
--- as @Alternative []@ is not distributive as shown below.
--- 
--- >>> import Control.Applicative
--- >>> let x = [id, id]
--- >>> let y = [1]; z = [2]
--- >>> x <*> (y <|> z)
--- [1,2,1,2]
--- >>> (x <*> y) <|> (x <*> z)
--- [1,1,2,2]
--- 
--- With such non-distributive @Cartesian p@, 'foldFreeCocartesian' does not preserve
--- the @Cartesian@ operations. The following equation does not have to hold.
---
--- @
--- -- Not necessarily holds!
--- foldFreeCocartesian id (ps *** qs)
---  == foldFreeCocartesian id ps *** foldFreeCocartesian id qs
--- @
--- 
+-- | @FreeCocartesian p@ is a 'Cartesian' profunctor freely generated from
+--   a mere @Profunctor p@.
 data FreeCocartesian p a b =
     Neutral (a -> Void)
   | Cons (Day Either p (FreeCocartesian p) a b)
   deriving Functor
-
-instance Cartesian p => Applicative (FreeCocartesian p a) where
-  pure = pureDefault
-  liftA2 = liftA2Default
 
 instance Profunctor (FreeCocartesian p) where
     dimap f g fp = case fp of
@@ -94,22 +53,6 @@ sumF ps qs = sumDayF (Day ps qs id id)
 instance Profunctor p => Cocartesian (FreeCocartesian p) where
     proEmpty = emptyF
     proSum opA opB ps qs = sumDayF (Day ps qs opA opB)
-
-instance Cartesian p => Cartesian (FreeCocartesian p) where
-    proUnit = liftF proUnit
-    (***) = multF (***)
-
-type ProductOp p q r = forall a1 b1 a2 b2. p a1 b1 -> q a2 b2 -> r (a1,a2) (b1,b2)
-
-multF :: ProductOp p q r -> FreeCocartesian p a b -> FreeCocartesian q a' b' -> FreeCocartesian r (a,a') (b,b')
-multF _    (Neutral z) _ = lmap (z . fst) emptyF
-multF prod (Cons (Day p ps' opA opB)) qs
-  = dimap (distL . first opA) (first opB . undistL) $
-      sumF (distLeftFree prod p qs) (multF prod ps' qs)
-
-distLeftFree :: ProductOp p q r -> p a b -> FreeCocartesian q a' b' -> FreeCocartesian r (a,a') (b,b')
-distLeftFree _    _ (Neutral z) = lmap (z . snd) emptyF
-distLeftFree prod p (Cons (Day q qs' opA opB)) = Cons $ Day (prod p q) (distLeftFree prod p qs') (distR . second opA) (second opB . undistR)
 
 -- * ProfunctorMonad structures
 

@@ -19,7 +19,7 @@ module Data.Finitary.TreeRep(
   -- ** Type-level @Rep@ algebra
   AddRep, MultRep,
   SRep(..), STreeRep(..),
-  (%++), (%*), sEmptyRep, sUnitRep, sIdRep,
+  sAddRep, (%++), sMultRep, sEmptyRep, sUnitRep, sIdRep,
   KnownRep(..), KnownTreeRep(..),
   withKnownRep, withKnownTreeRep,
   
@@ -51,6 +51,8 @@ import Data.PTraversable
 import Data.Finitary.Enum
 import Prelude hiding (Enum)
 import qualified Data.Profunctor.FinFn as FinFn
+
+import Data.List.TypeLevel
 
 -- | Representation of a finitary functor.
 --
@@ -181,9 +183,7 @@ maybeRep = UnitRep : idRep
 -- * Type-level promoted Rep and its singleton reflection
 
 -- | 'addRep' at type level
-type family AddRep (r1 :: Rep) (r2 :: Rep) :: Rep where
-  AddRep '[] r2 = r2
-  AddRep (t ': r1) r2 = t : AddRep r1 r2
+type AddRep (r1 :: Rep) (r2 :: Rep) = r1 ++ r2
 
 -- | 'multRep' at type level
 type family MultRep (r1 :: Rep) (r2 :: Rep) :: Rep where
@@ -210,16 +210,17 @@ deriving instance Eq (STreeRep r)
 deriving instance Ord (STreeRep r)
 
 -- | Compute the witness of 'AddRep'
-(%++) :: SRep r1 -> SRep r2 -> SRep (AddRep r1 r2)
+sAddRep, (%++) :: SRep r1 -> SRep r2 -> SRep (AddRep r1 r2)
+sAddRep = (%++)
 SEmpty %++ sr2 = sr2
 SCase st1 sr1 %++ sr2 = SCase st1 (sr1 %++ sr2)
 
 -- | Compute the witness of 'MultRep'
-(%*) :: SRep r1 -> SRep r2 -> SRep (MultRep r1 r2)
-sr1 %* sr2 = case sr1 of
+sMultRep :: SRep r1 -> SRep r2 -> SRep (MultRep r1 r2)
+sr1 `sMultRep` sr2 = case sr1 of
   SEmpty -> SEmpty
-  SCase SUnit sr1' -> sr2 %++ (sr1' %* sr2)
-  SCase (SPar ssub1) sr1' -> SCase (SPar (ssub1 %* sr2)) (sr1' %* sr2)
+  SCase SUnit sr1' -> sr2 %++ (sr1' `sMultRep` sr2)
+  SCase (SPar ssub1) sr1' -> SCase (SPar (ssub1 `sMultRep` sr2)) (sr1' `sMultRep` sr2)
 
 sEmptyRep :: SRep '[]
 sEmptyRep = sRep
@@ -408,8 +409,8 @@ fromProduct :: SRep r1 -> SRep r2 -> Eval r1 x -> Eval r2 x -> Eval (MultRep r1 
 fromProduct r1 r2 x y = case r1 of
   SEmpty -> absurdEval x
   SCase SUnit r1' -> case x of
-    EHere EUnit -> inlEval r2 (r1' %* r2) y
-    EThere x' -> inrEval r2 (r1' %* r2) (fromProduct r1' r2 x' y)
+    EHere EUnit -> inlEval r2 (r1' `sMultRep` r2) y
+    EThere x' -> inrEval r2 (r1' `sMultRep` r2) (fromProduct r1' r2 x' y)
   SCase (SPar sub1) r1' -> case x of
     EHere (EPar a x') -> EHere (EPar a (fromProduct sub1 r2 x' y))
     EThere x' -> EThere (fromProduct r1' r2 x' y)
@@ -417,7 +418,7 @@ fromProduct r1 r2 x y = case r1 of
 toProduct :: SRep r1 -> SRep r2 -> Eval (MultRep r1 r2) x -> (Eval r1 x, Eval r2 x)
 toProduct r1 r2 z = case r1 of
   SEmpty -> absurdEval z
-  SCase SUnit r1' -> case toSum r2 (r1' %* r2) z of
+  SCase SUnit r1' -> case toSum r2 (r1' `sMultRep` r2) z of
     Left y -> (EHere EUnit, y)
     Right z' -> first EThere $ toProduct r1' r2 z'
   SCase (SPar sub1) r1' -> case z of
@@ -457,7 +458,7 @@ instance Cartesian (Encoder a b) where
   (Encoder r1 enc1 dec1) *** (Encoder r2 enc2 dec2) =
     let enc (s1, s2) = fromProduct r1 r2 (enc1 s1) (enc2 s2)
         dec = bimap dec1 dec2 . toProduct r1 r2
-    in Encoder (r1 %* r2) enc dec
+    in Encoder (r1 `sMultRep` r2) enc dec
 
 instance Cocartesian (Encoder a b) where
   proEmpty = Encoder SEmpty absurd absurdEval
