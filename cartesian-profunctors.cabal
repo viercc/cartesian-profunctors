@@ -20,7 +20,6 @@ library
     Data.Profunctor.Counting,
     Data.Profunctor.FinFn,
     Data.Profunctor.Exhaust,
-    Data.Profunctor.UniconEncoding,
     Data.Finitary.Enum,
     Data.PTraversable,
     Data.Finitary.TreeRep,
