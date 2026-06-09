@@ -27,6 +27,9 @@ library
     Data.Finitary.PolyRep,
     Data.List.TypeLevel
   other-modules:
+    Data.PTraversable.Internal.ClassOnly,
+    Data.PTraversable.Internal.Generics,
+    Data.PTraversable.Internal.Instances,
     Data.PTraversable.Internal.Day,
     Data.Profunctor.Extra,
     GHC.Generics.Orphans

@@ -36,6 +36,9 @@ module Data.Finitary.TreeRep(
 
   -- * Building bidirectional encodings as a @Eval r@ with @Profunctor@
   Encoder(..), idEncoder,
+
+  -- * Internal-only type families
+  (++)
 ) where
 
 import Data.Kind (Type)
@@ -47,7 +50,7 @@ import Data.Functor.Classes ( Eq1(..), Ord1(..), compare1, eq1 )
 import Data.Profunctor (Profunctor (..))
 import Data.Profunctor.Cartesian
     ( Cartesian(proUnit, (***)), Cocartesian(proEmpty, (+++)) )
-import Data.PTraversable
+import Data.PTraversable.Internal.ClassOnly
 import Data.Finitary.Enum
 import Prelude hiding (Enum)
 import qualified Data.Profunctor.FinFn as FinFn

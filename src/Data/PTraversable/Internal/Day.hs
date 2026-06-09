@@ -3,7 +3,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeAbstractions #-}
 
-module Data.PTraversable.Internal.Day (ptraverseDay) where
+module Data.PTraversable.Internal.Day
+  (ptraverseDay, ptraverseDayWith) where
 
 import Prelude hiding (Enum)
 
@@ -15,12 +16,7 @@ import Data.Functor.Day ( Day(..), trans1, trans2 )
 import Data.Finitary.PolyRep
 import Data.Type.Equality
 
-type Optic p s t a b = p a b -> p s t
-type Traversal s t a b = forall p. (Cartesian p, Cocartesian p) => Optic p s t a b
-
--- An "instance" of (PTraversable t). They are used instead of constraint (PTraversable t),
--- because this module can't depend on Data.PTraversable module to avoid circular import.
-type PT t = forall a b. Traversal (t a) (t b) a b
+import Data.PTraversable.Internal.ClassOnly
 
 -- * Auxiliary definitions
 
@@ -55,21 +51,29 @@ dayEncoderF @t @u (EncoderF @r1 sr1 fromT toT) (EncoderF @r2 sr2 fromU toU) =
 
 -----------
 
-ptraverseDay :: forall t u p a b.
-     (Cartesian p, Cocartesian p)
-  => PT t -> PT u
-  -> p a b -> p (Day t u a) (Day t u b)
-ptraverseDay travT travU = travDayTU
+-- | 'Day' lacks various instances required to be a 'PTraversable'
+ptraverseDayWith :: forall t u.
+     (PTraversable t, PTraversable u)
+  => forall p a b as bs. (Cartesian p, Cocartesian p)
+  => (as -> Day t u a) -> (Day t u b -> bs) -> p a b -> p as bs
+ptraverseDayWith = travDayTU
   where
     encT :: EncoderF t
-    encT = unsafeGeneralizeEncoder (travT idEncoder)
+    encT = unsafeGeneralizeEncoder (ptraverse idEncoder)
 
     encU :: EncoderF u
-    encU = unsafeGeneralizeEncoder (travU idEncoder)
+    encU = unsafeGeneralizeEncoder (ptraverse idEncoder)
 
     encDayTU :: EncoderF (Day t u)
     encDayTU = dayEncoderF encT encU
 
-    travDayTU :: PT (Day t u)
-    travDayTU = case encDayTU of
-      EncoderF sr from to -> dimap from to . ptraverseEval sr
+    travDayTU :: forall p a b as bs. (Cartesian p, Cocartesian p)
+      => (as -> Day t u a) -> (Day t u b -> bs) -> p a b -> p as bs
+    travDayTU pre post = case encDayTU of
+      EncoderF sr from to -> dimap (from . pre) (post . to) . ptraverseEval sr
+
+ptraverseDay :: forall t u.
+     (PTraversable t, PTraversable u)
+  => forall p a b. (Cartesian p, Cocartesian p)
+  => p a b -> p (Day t u a) (Day t u b)
+ptraverseDay = ptraverseDayWith id id

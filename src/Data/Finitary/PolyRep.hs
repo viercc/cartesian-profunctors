@@ -54,7 +54,10 @@ module Data.Finitary.PolyRep (
   ptraverseEval,
 
   -- * Building bidirectional encodings as a @Eval r@ with @Profunctor@
-  Encoder(..), idEncoder
+  Encoder(..), idEncoder,
+
+  -- * Internal-only type families
+  (++), MultPoly1, DayPoly1
 ) where
 
 import Data.Kind (Type)
@@ -70,14 +73,16 @@ import Data.Finite
       separateProduct,
       separateSum,
       separateZero, finites )
-import Data.Void (absurd)
 
-import Data.Profunctor.Cartesian
+import Data.Void (absurd)
 import Data.Profunctor (Profunctor(..))
 import Data.Bifunctor (Bifunctor(..))
+import Data.Profunctor.Cartesian
 import Data.Type.Equality (TestEquality(..), type (:~:) (..))
 import Data.Functor.Day
 import Data.Functor.Classes
+
+import Data.PTraversable.Internal.ClassOnly
 
 -- | Finitary polynomial @f(x) = x^e1 + x^e2 + ... + x^en@
 --   represented as a list of exponents @[e1, e2, ..., en]@
@@ -169,25 +174,6 @@ withKnownPoly SNil body = body
 withKnownPoly (SCons se ses) body =
   withKnownNat se (withKnownPoly ses body)
 
-{-
-
-[Test]
-
-Define and print f(x) = 1 + x
-
->>> es = sPoly :: SPoly '[0,1]
->>> es
-SCons (SNat @0) (SCons (SNat @1) SNil)
-
-calculate f(x) * f(x) = 1 + x + x + x^2
-
->>> sMultPoly es es
-SCons (SNat @0) (SCons (SNat @1) (SCons (SNat @1) (SCons (SNat @2) SNil)))
->>> sMultPoly es es == (sPoly :: SPoly '[0,1,1,2])
-True
-
--}
-
 data Eval (r :: Poly) (x :: Type) where
   EHere :: !(Finite e -> x) -> Eval (e ': es) x
   EThere :: !(Eval es x) -> Eval (e ': es) x
@@ -203,9 +189,6 @@ absurdFinite = absurd . separateZero
 
 deriving instance Functor (Eval r)
 
-{-
-TODO: Resolve cyclic import issue and define these instances
-
 instance KnownPoly r => Foldable (Eval r) where
   foldMap = foldMapDefault
 
@@ -214,8 +197,6 @@ instance KnownPoly r => Traversable (Eval r) where
 
 instance KnownPoly r => PTraversable (Eval r) where
   ptraverseWith from to = dimap from to . ptraverseEval sPoly
-
--}
 
 instance (KnownPoly r, Eq a) => Eq (Eval r a) where
   (==) = eq1
